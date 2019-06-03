@@ -1,9 +1,12 @@
 # SVC
 
 Stochastic Vehicular Constabulary
+
 Snarky Vampires Cavorting
+
 Soggy View Controller
-Superb Vanishing Carrots*
+
+Superb Vanishing Carrots`*`
 
 Or, perhaps, a service framework of some kind.
 
@@ -25,5 +28,5 @@ Now that I'm working on some personal projects again in Go, I find
 myself needing that again, so this is my attempt to recreate part of
 it from scratch, but better this time. 
 
-* Apologies to [npm](https://www.npmjs.com/)
+`*` Apologies to [npm](https://www.npmjs.com/)
 
