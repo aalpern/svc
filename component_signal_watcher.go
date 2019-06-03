@@ -37,25 +37,22 @@ func NewSignalWatcher(handler SignalHandler, signals ...os.Signal) Component {
 	}
 }
 
-func WithSignalWatcher(handler SignalHandler, signals ...os.Signal) CompositeComponentOption {
-	return WithComponent(NewSignalWatcher(handler, signals...))
-}
-
 func WithShutdownWatcher() CompositeComponentOption {
-	return WithSignalWatcher(func(ctx context.Context, sig os.Signal) {
-		log.WithFields(log.Fields{
-			"action": "shutdown_signal",
-			"status": "signaled",
-			"signal": sig,
-		}).Info("Initiating shutdown")
-		if svc := GetService(ctx); svc != nil {
-			svc.Exit(0)
-		} else {
+	return WithNamedComponent("shutdown-watcher",
+		NewSignalWatcher(func(ctx context.Context, sig os.Signal) {
 			log.WithFields(log.Fields{
 				"action": "shutdown_signal",
-				"status": "no_service",
-			}).Warn("No bound Service instance, performing hard exit")
-			os.Exit(0)
-		}
-	}, ShutdownSignals...)
+				"status": "signaled",
+				"signal": sig,
+			}).Info("Initiating shutdown")
+			if svc := GetService(ctx); svc != nil {
+				svc.Exit(0)
+			} else {
+				log.WithFields(log.Fields{
+					"action": "shutdown_signal",
+					"status": "no_service",
+				}).Warn("No bound Service instance, performing hard exit")
+				os.Exit(0)
+			}
+		}, ShutdownSignals...))
 }

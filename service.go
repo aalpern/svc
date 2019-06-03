@@ -90,11 +90,19 @@ func NewService(name, description string, configs ...ServiceConfig) (*Service, e
 		}
 	}
 
+	if ci, ok := svc.Global.(CommandInitializer); ok {
+		ci.CommandInitialize(svc.Command)
+	}
+
 	return svc, nil
 }
 
 func (svc *Service) Start(ctx context.Context) error {
 	if svc.Global != nil {
+		log.WithFields(log.Fields{
+			"action": "service_start",
+			"status": "starting_global",
+		}).Debug()
 		return svc.Global.Start(ctx)
 	}
 	return nil
@@ -102,6 +110,10 @@ func (svc *Service) Start(ctx context.Context) error {
 
 func (svc *Service) Stop() error {
 	if svc.Global != nil {
+		log.WithFields(log.Fields{
+			"action": "service_stop",
+			"status": "stopping_global",
+		}).Debug()
 		return svc.Global.Stop()
 	}
 	return nil
@@ -178,7 +190,13 @@ func WithCommandHandler(name, description string, handler Component) ServiceConf
 		}
 
 		cmd.PostRun = func(cmd *cobra.Command, args []string) {
-			log.Info("WithCommandHandler.PostRun()")
+			if err := handler.Stop(); err != nil {
+				log.WithFields(log.Fields{
+					"action": "command_handler",
+					"status": "stop_error",
+					"error":  err,
+				}).Error("Error stopping command handler")
+			}
 		}
 
 		svc.Command.AddCommand(cmd)

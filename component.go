@@ -3,6 +3,7 @@ package svc
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 )
 
@@ -49,7 +50,12 @@ func WithNamedComponent(name string, c Component) CompositeComponentOption {
 }
 
 func (c *CompositeComponent) Start(ctx context.Context) error {
-	for _, child := range c.children.list {
+	for i, child := range c.children.list {
+		log.WithFields(log.Fields{
+			"action":          "start_composite_component",
+			"component_index": i,
+			"component_name":  child.Name,
+		}).Debug()
 		if err := child.Component.Start(ctx); err != nil {
 			return err
 		}
@@ -58,7 +64,13 @@ func (c *CompositeComponent) Start(ctx context.Context) error {
 }
 
 func (c *CompositeComponent) Stop() error {
-	for _, child := range c.children.list {
+	for i := len(c.children.list) - 1; i >= 0; i-- {
+		child := c.children.list[i]
+		log.WithFields(log.Fields{
+			"action":          "stop_composite_component",
+			"component_index": i,
+			"component_name":  child.Name,
+		}).Debug()
 		if err := child.Component.Stop(); err != nil {
 			return err
 		}
@@ -67,7 +79,13 @@ func (c *CompositeComponent) Stop() error {
 }
 
 func (c *CompositeComponent) Kill() error {
-	for _, child := range c.children.list {
+	for i := len(c.children.list) - 1; i >= 0; i-- {
+		child := c.children.list[i]
+		log.WithFields(log.Fields{
+			"action":          "kill_composite_component",
+			"component_index": i,
+			"component_name":  child.Name,
+		}).Debug()
 		if err := child.Component.Kill(); err != nil {
 			return err
 		}
