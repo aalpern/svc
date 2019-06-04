@@ -119,29 +119,25 @@ type CompositeComponent struct {
 	children NamedComponentList
 }
 
-type CompositeComponentOption func(*CompositeComponent) error
+type CompositeComponentOption func(*CompositeComponent)
 
-func NewCompositeComponent(opts ...CompositeComponentOption) (*CompositeComponent, error) {
+func NewCompositeComponent(opts ...CompositeComponentOption) *CompositeComponent {
 	c := &CompositeComponent{}
 	for _, opt := range opts {
-		if err := opt(c); err != nil {
-			return nil, err
-		}
+		opt(c)
 	}
-	return c, nil
+	return c
 }
 
 func WithComponent(c Component) CompositeComponentOption {
-	return func(cc *CompositeComponent) error {
+	return func(cc *CompositeComponent) {
 		cc.children.PushBack(c)
-		return nil
 	}
 }
 
 func WithNamedComponent(name string, c Component) CompositeComponentOption {
-	return func(cc *CompositeComponent) error {
+	return func(cc *CompositeComponent) {
 		cc.children.PushBackNamed(&NamedComponent{c, name})
-		return nil
 	}
 }
 

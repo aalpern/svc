@@ -2,6 +2,7 @@ package svc
 
 import (
 	"context"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -50,6 +51,8 @@ func GetService(ctx context.Context) *Service {
 
 type ServiceConfig func(svc *Service) error
 
+// NewService constructs a new Service instance from the given name,
+// descript, and configs.
 func NewService(name, description string, configs ...ServiceConfig) (*Service, error) {
 	svc := &Service{
 		Command: NewCommand(name, description),
@@ -60,7 +63,8 @@ func NewService(name, description string, configs ...ServiceConfig) (*Service, e
 	// Persistent pre run handler initializes the global component for
 	// all commands
 	svc.Command.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		if err := svc.Start(context.Background()); err != nil {
+		ctx := WithServiceContext(context.Background(), svc)
+		if err := svc.Start(ctx); err != nil {
 			log.WithFields(log.Fields{
 				"action": "service_global_start",
 				"status": "error",
@@ -71,7 +75,8 @@ func NewService(name, description string, configs ...ServiceConfig) (*Service, e
 		return nil
 	}
 
-	// And a persistent post run handler stops it after all commands
+	// And a persistent post run handler stops the global component
+	// after all commands
 	svc.Command.PersistentPostRunE = func(cmd *cobra.Command, args []string) error {
 		if err := svc.Stop(); err != nil {
 			log.WithFields(log.Fields{
@@ -155,15 +160,23 @@ func WithGlobal(cmp Component) ServiceConfig {
 
 // WithCommandHandler creates a new command for the service process
 // and binds it to the supplied Component, whose Start() method
-// becomes the main loop of the process.
+// becomes the main loop of the command.
 //
 // The Start() method of the handler component will be run in a new go
 // routine, while the main go routine waits for an exit code on a
 // shutdown channel. The Start() routine of the main handler component
 // may block (e.g. if it implements a network server).
+//
+// A PostRun handler on the command handles calling Stop() to shut
+// down the component, with a configurable timeout before calling
+// Kill() if the ordered shutdown takes too long.
 func WithCommandHandler(name, description string, handler Component) ServiceConfig {
 	return func(svc *Service) error {
+		killTimeout := 30 * time.Second
 		cmd := NewCommand(name, description, handler)
+
+		cmd.Flags().DurationVar(&killTimeout, "service-kill-timeout", 30*time.Second,
+			"Time to wait for ordered shutdown to complete before hard exit")
 
 		cmd.Run = func(cmd *cobra.Command, args []string) {
 			log.WithFields(log.Fields{
@@ -189,13 +202,33 @@ func WithCommandHandler(name, description string, handler Component) ServiceConf
 			}).Info()
 		}
 
+		// PostRun handler issues the call to Stop() to perform
+		// ordered shut down, using some go routine/channel
+		// shenangigans to implement a timeout.
 		cmd.PostRun = func(cmd *cobra.Command, args []string) {
-			if err := handler.Stop(); err != nil {
+			stop := make(chan interface{})
+			go func() {
+				if err := handler.Stop(); err != nil {
+					log.WithFields(log.Fields{
+						"action": "command_handler",
+						"status": "stop_error",
+						"error":  err,
+					}).Error("Error stopping command handler")
+				}
+				// We don't send any data back on the channel, just
+				// close it to indicate that the stop has completed.
+				close(stop)
+			}()
+
+			select {
+			case <-stop:
+			case <-time.After(killTimeout):
 				log.WithFields(log.Fields{
-					"action": "command_handler",
-					"status": "stop_error",
-					"error":  err,
-				}).Error("Error stopping command handler")
+					"action":  "command_handler",
+					"status":  "stop_timeout",
+					"timeout": killTimeout,
+				}).Info("Ordered stop timed out, killing")
+				handler.Kill()
 			}
 		}
 

@@ -12,32 +12,40 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const (
+	DefaultProfileAddr = ":8081"
+)
+
 type ProfileServer struct {
-	addr   string
-	enable bool
+	Addr   string
+	Enable bool
 	server *manners.GracefulServer
 }
 
 func (p *ProfileServer) CommandInitialize(cmd *cobra.Command) {
-	cmd.Flags().BoolVarP(&p.enable, "profile-server-enable", "", false,
+	defaultaddr := p.Addr
+	if defaultaddr == "" {
+		defaultaddr = DefaultProfileAddr
+	}
+	cmd.Flags().BoolVar(&p.Enable, "profile-server-enable", p.Enable,
 		"If enabled, start an HTTP profile server for diagnostics")
-	cmd.Flags().StringVarP(&p.addr, "profile-server-addr", "", ":8081",
+	cmd.Flags().StringVar(&p.Addr, "profile-server-addr", defaultaddr,
 		"Address to bind the HTTP profile server to, if enabled")
 }
 
 func (p *ProfileServer) Start(ctx context.Context) error {
-	if p.enable {
+	if p.Enable {
 		log.WithFields(log.Fields{
 			"action": "profile_server",
 			"status": "start",
-			"addr":   p.addr,
+			"addr":   p.Addr,
 		}).Info()
 
 		exp.Exp(metrics.DefaultRegistry)
 		metricscharts.Register()
 
 		p.server = manners.NewWithServer(&http.Server{
-			Addr:    p.addr,
+			Addr:    p.Addr,
 			Handler: http.DefaultServeMux,
 		})
 
@@ -61,9 +69,15 @@ func (p *ProfileServer) Start(ctx context.Context) error {
 }
 
 func (p *ProfileServer) Stop() error {
+	if p.server != nil {
+		p.server.BlockingClose()
+	}
 	return nil
 }
 
 func (p *ProfileServer) Kill() error {
-	return p.Stop()
+	if p.server != nil {
+		p.server.Close()
+	}
+	return nil
 }

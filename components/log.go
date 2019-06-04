@@ -12,7 +12,7 @@ type LogConfigComponent struct {
 }
 
 func (p *LogConfigComponent) CommandInitialize(cmd *cobra.Command) {
-	cmd.PersistentFlags().BoolVarP(&p.verbose, "log-verbose", "", false,
+	cmd.PersistentFlags().BoolVarP(&p.verbose, "log-verbose", "v", false,
 		"Set logging level to verbose (debug)")
 }
 
