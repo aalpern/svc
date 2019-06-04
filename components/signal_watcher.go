@@ -1,4 +1,4 @@
-package svc
+package components
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/aalpern/svc"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,8 +18,8 @@ var (
 
 type SignalHandler func(context.Context, os.Signal)
 
-func NewSignalWatcher(handler SignalHandler, signals ...os.Signal) Component {
-	return &SimpleComponent{
+func NewSignalWatcher(handler SignalHandler, signals ...os.Signal) svc.Component {
+	return &svc.SimpleComponent{
 		OnStart: func(ctx context.Context) error {
 			go func() {
 				chn := make(chan os.Signal, 1)
@@ -37,22 +38,21 @@ func NewSignalWatcher(handler SignalHandler, signals ...os.Signal) Component {
 	}
 }
 
-func WithShutdownWatcher() CompositeComponentOption {
-	return WithNamedComponent("shutdown-watcher",
-		NewSignalWatcher(func(ctx context.Context, sig os.Signal) {
+func NewShutdownWatcher() svc.Component {
+	return NewSignalWatcher(func(ctx context.Context, sig os.Signal) {
+		log.WithFields(log.Fields{
+			"action": "shutdown_signal",
+			"status": "signaled",
+			"signal": sig,
+		}).Info("Initiating shutdown")
+		if s := svc.GetService(ctx); s != nil {
+			s.Exit(0)
+		} else {
 			log.WithFields(log.Fields{
 				"action": "shutdown_signal",
-				"status": "signaled",
-				"signal": sig,
-			}).Info("Initiating shutdown")
-			if svc := GetService(ctx); svc != nil {
-				svc.Exit(0)
-			} else {
-				log.WithFields(log.Fields{
-					"action": "shutdown_signal",
-					"status": "no_service",
-				}).Warn("No bound Service instance, performing hard exit")
-				os.Exit(0)
-			}
-		}, ShutdownSignals...))
+				"status": "no_service",
+			}).Warn("No bound Service instance, performing hard exit")
+			os.Exit(0)
+		}
+	}, ShutdownSignals...)
 }
