@@ -158,7 +158,7 @@ func WithGlobal(cmp Component) ServiceConfig {
 	}
 }
 
-// WithCommandHandler creates a new command for the service process
+// WithComponentCommand creates a new command for the service process
 // and binds it to the supplied Component, whose Start() method
 // becomes the main loop of the command.
 //
@@ -170,7 +170,7 @@ func WithGlobal(cmp Component) ServiceConfig {
 // A PostRun handler on the command handles calling Stop() to shut
 // down the component, with a configurable timeout before calling
 // Kill() if the ordered shutdown takes too long.
-func WithCommandHandler(name, description string, handler Component) ServiceConfig {
+func WithComponentCommand(name, description string, handler Component) ServiceConfig {
 	return func(svc *Service) error {
 		killTimeout := 30 * time.Second
 		cmd := NewCommand(name, description, handler)
